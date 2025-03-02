@@ -1,4 +1,4 @@
-import os, shutil
+import os, shutil, sys
 
 from textnode import TextType, TextNode
 from blocknode import BlockType
@@ -40,8 +40,8 @@ def populate_directory_with_contents(source, target):
         else:
             print("no idea what this is!")
 
-def generate_page(from_path, template_path, dest_path):
-    print(f"Generatting page from {from_path} to {dest_path} using {template_path}")
+def generate_page(from_path, template_path, dest_path, basepath):
+    print(f"Generating page from {from_path} to {dest_path} using {template_path}")
     with open(from_path, "r") as infile:
         md = infile.read()
     title = extract_title(md)
@@ -51,24 +51,47 @@ def generate_page(from_path, template_path, dest_path):
     content = node.to_html()
     tp = tp.replace("{{ Title }}", title)
     tp = tp.replace("{{ Content }}", content)
+    tp = tp.replace('href="/', f'href="{basepath}')
+    tp = tp.replace('src="/', f'src="{basepath}')
     target_dirs = os.path.dirname(dest_path)
-    #print(target_dirs)
     if not os.path.exists(target_dirs):
         os.makedirs(target_dirs)
     with open(dest_path, "w") as outfile:
         outfile.write(tp)
 
+def generate_pages_recursive(dir_path_content, template_path, dest_dir_path, basepath):
+    files_in_dir = os.listdir(dir_path_content)
+    if not files_in_dir:
+        return
+    else:
+        for file in files_in_dir:
+            print("file in list of files", file)
+            if os.path.isdir(os.path.join(dir_path_content, file)):
+                os.mkdir(os.path.join(dest_dir_path, file))
+                generate_pages_recursive(os.path.join(dir_path_content, file), template_path, os.path.join(dest_dir_path, file), basepath)
+            else:
+                filepath, file_extension = os.path.splitext(os.path.join(dir_path_content, file))
+                filename = os.path.basename(filepath)
+                if file_extension == ".md":
+                    filename += '.html'
+                    generate_page(os.path.join(dir_path_content, file), template_path, os.path.join(dest_dir_path, filename), basepath)
 
 def main():
 
-    remove_directory_contents('public')
-    populate_directory_with_contents('static', 'public')
+    if len(sys.argv) > 1:
+        basepath = sys.argv[1]
+    else:
+        basepath = "/"
 
-    generate_page("content/index.md", "./template.html", "public/index.html")
-    generate_page("content/blog/glorfindel/index.md", "./template.html", "public/blog/glorfindel/index.html")
-    generate_page("content/blog/tom/index.md", "./template.html", "public/blog/tom/index.html")
-    generate_page("content/blog/majesty/index.md", "./template.html", "public/blog/majesty/index.html")
-    generate_page("content/contact/index.md", "./template.html", "public/contact/index.html")
+    remove_directory_contents('docs')
+    populate_directory_with_contents('static', 'docs')
+    generate_pages_recursive('content', './template.html', 'docs', basepath)
+    
+    #generate_page("content/index.md", "./template.html", "public/index.html", basepath)
+    #generate_page("content/blog/glorfindel/index.md", "./template.html", "public/blog/glorfindel/index.html", basepath)
+    #generate_page("content/blog/tom/index.md", "./template.html", "public/blog/tom/index.html", basepath)
+    #generate_page("content/blog/majesty/index.md", "./template.html", "public/blog/majesty/index.html", basepath)
+    #generate_page("content/contact/index.md", "./template.html", "public/contact/index.html", basepath)
 
     #node = markdown_to_html_node("![JRR Tolkien sitting](/images/tolkien.png)")
     #print(node)
